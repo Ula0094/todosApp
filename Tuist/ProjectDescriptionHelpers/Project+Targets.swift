@@ -14,13 +14,12 @@ public extension Target {
         sources: ["TodosApp/Sources/**"],
         resources: ["TodosApp/Resources/**"],
         dependencies: [
-            .stevia,
-            .sqlite
+            .stevia
         ]
     )
 
     static let todosAppTests: Target = .target(
-        name: "todosAppTests",
+        name: "TodosAppTests",
         destinations: .iOS,
         product: .unitTests,
         bundleId: "io.tuist.todosAppTests",

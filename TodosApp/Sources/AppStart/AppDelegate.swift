@@ -12,20 +12,15 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     
     var window: UIWindow?
     
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         
         let window = UIWindow(frame: UIScreen.main.bounds)
         
-        let rootVC = MainModuleBuilder.build()
-        
-        let nav = UINavigationController(rootViewController: rootVC)
-        window.rootViewController = nav
+        let rootVC = TodoListBuilder.build()
+        let navigationController = UINavigationController(rootViewController: rootVC)
+        window.rootViewController = navigationController
         window.makeKeyAndVisible()
-        
+        self.window = window
         return true
     }
 }

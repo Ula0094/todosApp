@@ -6,5 +6,5 @@ let project = Project(
     targets: [
         .todosApp,
         .todosAppTests,
-        ]
+    ]
 )
