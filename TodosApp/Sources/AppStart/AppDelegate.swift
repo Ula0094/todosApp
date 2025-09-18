@@ -14,7 +14,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(
         _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         
         
@@ -23,8 +23,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let rootVC = MainModuleBuilder.build()
         
         let nav = UINavigationController(rootViewController: rootVC)
-        nav.navigationBar.prefersLargeTitles = true
         window.rootViewController = nav
         window.makeKeyAndVisible()
+        
+        return true
     }
 }
