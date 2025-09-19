@@ -21,15 +21,21 @@ protocol TodosAPI {
         limit: Int,
         completion: @escaping (Result<PaginatedTodos, Error>) -> Void
     )
+    
+    func fetchUsers(completion: @escaping (Result<[User], Error>) -> Void)
 }
 
 final class TodosAPIClient: TodosAPI {
     private let session: URLSession
     private let baseURL: URL
     
-    private var cachedTodos: [Todo]?
+    private var cachedTodos: [Todo] = []
+    private var cachedUsers: [User]?
     
-    init(session: URLSession = .shared, baseURL: URL = URL(string: "https://jsonplaceholder.typicode.com")!) {
+    init(
+        session: URLSession = .shared,
+        baseURL: URL = URL(string: "https://jsonplaceholder.typicode.com")!
+    ) {
         self.session = session
         self.baseURL = baseURL
     }
@@ -39,8 +45,8 @@ final class TodosAPIClient: TodosAPI {
         limit: Int,
         completion: @escaping (Result<PaginatedTodos, Error>) -> Void
     ) {
-        if let cachedTodos, page > 1 {
-            completion(.success(Self.paginate(todos: cachedTodos, page: page, limit: limit)))
+        if page > 1, !cachedTodos.isEmpty {
+            respondWithCachedTodos(page: page, limit: limit, completion: completion)
             return
         }
         
@@ -53,6 +59,7 @@ final class TodosAPIClient: TodosAPI {
         request.httpMethod = "GET"
         
         let task = session.dataTask(with: request) { [weak self] data, response, error in
+            guard let self else { return }
             if let error {
                 completion(.failure(APIError.underlying(error)))
                 return
@@ -75,14 +82,71 @@ final class TodosAPIClient: TodosAPI {
             
             do {
                 let todos = try JSONDecoder().decode([Todo].self, from: data)
-                self?.cachedTodos = todos
-                completion(.success(Self.paginate(todos: todos, page: page, limit: limit)))
+                self.cachedTodos = todos
+                self.respondWithCachedTodos(page: page, limit: limit, completion: completion)
             } catch {
                 completion(.failure(APIError.decoding(error)))
             }
         }
         
         task.resume()
+        }
+
+        func fetchUsers(
+            completion: @escaping (Result<[User], Error>) -> Void
+        ) {
+            if let cachedUsers {
+                completion(.success(cachedUsers))
+                return
+            }
+
+            guard let url = URL(string: "users", relativeTo: baseURL) else {
+                completion(.failure(APIError.invalidURL))
+                return
+            }
+
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+
+            let task = session.dataTask(with: request) { [weak self] data, response, error in
+                if let error {
+                    completion(.failure(APIError.underlying(error)))
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    completion(.failure(APIError.invalidResponse))
+                    return
+                }
+
+                guard (200..<300).contains(httpResponse.statusCode) else {
+                    completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode)))
+                    return
+                }
+
+                guard let data else {
+                    completion(.failure(APIError.invalidResponse))
+                    return
+                }
+
+                do {
+                    let users = try JSONDecoder().decode([User].self, from: data)
+                    self?.cachedUsers = users
+                    completion(.success(users))
+                } catch {
+                    completion(.failure(APIError.decoding(error)))
+                }
+            }
+        
+        task.resume()
+    }
+    
+    private func respondWithCachedTodos(
+        page: Int,
+        limit: Int,
+        completion: @escaping (Result<PaginatedTodos, Error>) -> Void
+    ) {
+        completion(.success(Self.paginate(todos: cachedTodos, page: page, limit: limit)))
     }
     
     private static func paginate(todos: [Todo], page: Int, limit: Int) -> PaginatedTodos {

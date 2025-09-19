@@ -12,6 +12,7 @@ protocol TodoListView: AnyObject {
     func setFooterLoading(_ isLoading: Bool)
     func showTodos(_ viewModels: [TodoListItemViewModel], reset: Bool)
     func showError(message: String)
+    func showTodoDetails(_ viewModel: TodoDetailsViewModel)
 }
 
 protocol TodoListPresenting {
@@ -19,6 +20,7 @@ protocol TodoListPresenting {
     func viewDidLoad()
     func didPullToRefresh()
     func didReachItem(at index: Int)
+    func didSelectTodo(with id: Int)
 }
 
 final class TodoListPresenter: TodoListPresenting {
@@ -27,6 +29,9 @@ final class TodoListPresenter: TodoListPresenting {
     private let pageSize: Int
     private var paginationState = PaginationState()
     private var cachedViewModels: [TodoListItemViewModel] = []
+    
+    private var cachedTodos: [Todo] = []
+    private var usersById: [Int: User] = [:]
     
     init(apiClient: TodosAPI, pageSize: Int = 20) {
         self.apiClient = apiClient
@@ -50,11 +55,21 @@ final class TodoListPresenter: TodoListPresenting {
         loadNextPage()
     }
     
+    func didSelectTodo(with id: Int) {
+        guard let todo = cachedTodos.first(where: { $0.id == id }) else { return }
+        let user = todo.userId.flatMap { usersById[$0] }
+        let detailsViewModel = TodoDetailsViewModel(todo: todo, user: user)
+        view?.showTodoDetails(detailsViewModel)
+    }
+    
     private func loadFirstPage() {
         paginationState.reset()
         cachedViewModels.removeAll()
+        cachedTodos.removeAll()
         view?.showLoading(true)
-        loadNextPage(reset: true)
+        fetchUsersIfNeeded { [weak self] in
+            self?.loadNextPage(reset: true)
+        }
     }
     
     private func loadNextPage(reset: Bool = false) {
@@ -68,10 +83,15 @@ final class TodoListPresenter: TodoListPresenting {
                 switch result {
                 case let .success(pageResponse):
                     self.paginationState.completeLoading(with: pageResponse)
-                    let newViewModels = pageResponse.todos.map(TodoListItemViewModel.init)
+                    let newViewModels = pageResponse.todos.map { todo in
+                        let user = todo.userId.flatMap { self.usersById[$0] }
+                        return TodoListItemViewModel(todo: todo, user: user)
+                    }
                     if reset {
+                        self.cachedTodos = pageResponse.todos
                         self.cachedViewModels = newViewModels
                     } else {
+                        self.cachedTodos.append(contentsOf: pageResponse.todos)
                         self.cachedViewModels.append(contentsOf: newViewModels)
                     }
                     self.view?.showLoading(false)
@@ -81,6 +101,26 @@ final class TodoListPresenter: TodoListPresenting {
                     self.view?.showLoading(false)
                     self.view?.showError(message: Self.errorMessage(from: error))
                 }
+            }
+        }
+    }
+    
+    private func fetchUsersIfNeeded(completion: @escaping () -> Void) {
+        guard usersById.isEmpty else {
+            completion()
+            return
+        }
+        
+        apiClient.fetchUsers { [weak self] result in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                switch result {
+                case let .success(users):
+                    self.usersById = Dictionary(uniqueKeysWithValues: users.map { ($0.id, $0) })
+                case let .failure(error):
+                    self.view?.showError(message: Self.errorMessage(from: error))
+                }
+                completion()
             }
         }
     }

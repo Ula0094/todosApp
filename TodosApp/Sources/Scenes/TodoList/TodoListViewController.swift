@@ -9,7 +9,9 @@ import UIKit
 
 final class TodoListViewController: UIViewController {
     private let presenter: TodoListPresenting
-    private var items: [TodoListItemViewModel] = []
+    
+    private var allItems: [TodoListItemViewModel] = []
+    private var filteredItems: [TodoListItemViewModel] = []
     
     private lazy var tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .plain)
@@ -20,6 +22,15 @@ final class TodoListViewController: UIViewController {
         tableView.tableFooterView = activityIndicator
         tableView.refreshControl = refreshControl
         return tableView
+    }()
+    
+    private lazy var searchController: UISearchController = {
+        let controller = UISearchController(searchResultsController: nil)
+        controller.searchResultsUpdater = self
+        controller.obscuresBackgroundDuringPresentation = false
+        controller.searchBar.placeholder = "Search by title or user"
+        controller.searchBar.delegate = self
+        return controller
     }()
     
     private lazy var refreshControl: UIRefreshControl = {
@@ -63,6 +74,10 @@ final class TodoListViewController: UIViewController {
         view.backgroundColor = .systemBackground
         view.addSubview(tableView)
         
+        navigationItem.searchController = searchController
+        navigationItem.hidesSearchBarWhenScrolling = false
+        definesPresentationContext = true
+        
         NSLayoutConstraint.activate([
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -75,16 +90,34 @@ final class TodoListViewController: UIViewController {
     private func refreshTriggered() {
         presenter.didPullToRefresh()
     }
+    
+    private var isFiltering: Bool {
+        let searchBarIsEmpty = (searchController.searchBar.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return searchController.isActive && !searchBarIsEmpty
+    }
+    
+    private func applyFilter(with text: String?) {
+        let trimmed = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            filteredItems = allItems
+        } else {
+            filteredItems = allItems.filter { item in
+                item.title.range(of: trimmed, options: .caseInsensitive) != nil ||
+                item.subtitle.range(of: trimmed, options: .caseInsensitive) != nil
+            }
+        }
+        tableView.reloadData()
+    }
 }
 
 extension TodoListViewController: UITableViewDataSource {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        items.count
+        filteredItems.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
-        let item = items[indexPath.row]
+        let item = filteredItems[indexPath.row]
         var configuration = UIListContentConfiguration.subtitleCell()
         configuration.text = item.title
         configuration.secondaryText = item.subtitle
@@ -95,7 +128,13 @@ extension TodoListViewController: UITableViewDataSource {
 
 extension TodoListViewController: UITableViewDelegate {
     func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        guard !isFiltering else { return }
         presenter.didReachItem(at: indexPath.row)
+    }
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let item = filteredItems[indexPath.row]
+        presenter.didSelectTodo(with: item.id)
     }
 }
 
@@ -123,16 +162,33 @@ extension TodoListViewController: TodoListView {
     
     func showTodos(_ viewModels: [TodoListItemViewModel], reset: Bool) {
         if reset {
-            items = viewModels
+            allItems = viewModels
         } else {
-            items.append(contentsOf: viewModels)
+            allItems.append(contentsOf: viewModels)
         }
-        tableView.reloadData()
+        applyFilter(with: searchController.searchBar.text)
     }
     
     func showError(message: String) {
         let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
+    }
+    
+    func showTodoDetails(_ viewModel: TodoDetailsViewModel) {
+        let detailsViewController = TodoDetailsViewController(viewModel: viewModel)
+        navigationController?.pushViewController(detailsViewController, animated: true)
+    }
+}
+
+extension TodoListViewController: UISearchResultsUpdating {
+    func updateSearchResults(for searchController: UISearchController) {
+        applyFilter(with: searchController.searchBar.text)
+    }
+}
+
+extension TodoListViewController: UISearchBarDelegate {
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        applyFilter(with: nil)
     }
 }
