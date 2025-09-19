@@ -82,27 +82,19 @@ extension TodoListViewController: UITableViewDataSource {
         items.count
     }
     
-    func tableView(
-        _ tableView: UITableView,
-        cellForRowAt indexPath: IndexPath
-    ) -> UITableViewCell {
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
         let item = items[indexPath.row]
         var configuration = UIListContentConfiguration.subtitleCell()
         configuration.text = item.title
         configuration.secondaryText = item.subtitle
         cell.contentConfiguration = configuration
-        cell.accessoryType = item.isCompleted ? .checkmark : .none
         return cell
     }
 }
 
 extension TodoListViewController: UITableViewDelegate {
-    func tableView(
-        _ tableView: UITableView,
-        willDisplay cell: UITableViewCell,
-        forRowAt indexPath: IndexPath
-    ) {
+    func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
         presenter.didReachItem(at: indexPath.row)
     }
 }
