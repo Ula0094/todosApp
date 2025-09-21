@@ -29,15 +29,20 @@ final class TodosAPIClient: TodosAPI {
     private let session: URLSession
     private let baseURL: URL
     
-    private var cachedTodos: [Todo] = []
+    private let cache: TodosCaching
+    
+    private var cachedTodos: [Todo]
     private var cachedUsers: [User]?
     
     init(
         session: URLSession = .shared,
-        baseURL: URL = URL(string: "https://jsonplaceholder.typicode.com")!
+        baseURL: URL = URL(string: "https://jsonplaceholder.typicode.com")!,
+        cache: TodosCaching = TodosFileCache()
     ) {
         self.session = session
         self.baseURL = baseURL
+        self.cache = cache
+        self.cachedTodos = (try? cache.loadTodos()) ?? []
     }
     
     func fetchTodos(
@@ -61,31 +66,56 @@ final class TodosAPIClient: TodosAPI {
         let task = session.dataTask(with: request) { [weak self] data, response, error in
             guard let self else { return }
             if let error {
-                completion(.failure(APIError.underlying(error)))
+                self.completeWithFallback(
+                    page: page,
+                    limit: limit,
+                    completion: completion,
+                    error: APIError.underlying(error)
+                )
                 return
             }
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(APIError.invalidResponse))
+                self.completeWithFallback(
+                    page: page,
+                    limit: limit,
+                    completion: completion,
+                    error: APIError.invalidResponse
+                )
                 return
             }
             
             guard (200..<300).contains(httpResponse.statusCode) else {
-                completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode)))
+                self.completeWithFallback(
+                    page: page,
+                    limit: limit,
+                    completion: completion,
+                    error: APIError.serverError(statusCode: httpResponse.statusCode)
+                )
                 return
             }
             
             guard let data else {
-                completion(.failure(APIError.invalidResponse))
+                self.completeWithFallback(
+                    page: page,
+                    limit: limit,
+                    completion: completion,
+                    error: APIError.invalidResponse
+                )
                 return
             }
             
             do {
                 let todos = try JSONDecoder().decode([Todo].self, from: data)
-                self.cachedTodos = todos
+                self.updateTodosCache(with: todos)
                 self.respondWithCachedTodos(page: page, limit: limit, completion: completion)
             } catch {
-                completion(.failure(APIError.decoding(error)))
+                self.completeWithFallback(
+                    page: page,
+                    limit: limit,
+                    completion: completion,
+                    error: APIError.decoding(error)
+                )
             }
         }
         
@@ -145,6 +175,37 @@ final class TodosAPIClient: TodosAPI {
         completion: @escaping (Result<PaginatedTodos, Error>) -> Void
     ) {
         completion(.success(Self.paginate(todos: cachedTodos, page: page, limit: limit)))
+    }
+    
+    private func respondWithCachedTodosIfAvailable(
+        page: Int,
+        limit: Int,
+        completion: @escaping (Result<PaginatedTodos, Error>) -> Void
+    ) -> Bool {
+        guard !cachedTodos.isEmpty else { return false }
+        respondWithCachedTodos(page: page, limit: limit, completion: completion)
+        return true
+    }
+    
+    private func completeWithFallback(
+        page: Int,
+        limit: Int,
+        completion: @escaping (Result<PaginatedTodos, Error>) -> Void,
+        error: Error
+    ) {
+        guard !respondWithCachedTodosIfAvailable(page: page, limit: limit, completion: completion) else {
+            return
+        }
+        completion(.failure(error))
+    }
+    
+    private func updateTodosCache(with todos: [Todo]) {
+        cachedTodos = todos
+        do {
+            try cache.saveTodos(todos)
+        } catch {
+            assertionFailure("Failed to save todos cache: \(error)")
+        }
     }
     
     private static func paginate(
