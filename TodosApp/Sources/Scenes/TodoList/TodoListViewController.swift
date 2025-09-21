@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import Stevia
 
 final class TodoListViewController: UIViewController {
     private let presenter: TodoListPresenting
@@ -15,7 +16,6 @@ final class TodoListViewController: UIViewController {
     
     private lazy var tableView: UITableView = {
         let tableView = UITableView(frame: .zero, style: .plain)
-        tableView.translatesAutoresizingMaskIntoConstraints = false
         tableView.dataSource = self
         tableView.delegate = self
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "cell")
@@ -72,18 +72,15 @@ final class TodoListViewController: UIViewController {
     private func configureView() {
         title = "Todos"
         view.backgroundColor = .systemBackground
-        view.addSubview(tableView)
+        view.subviews(tableView)
         
         navigationItem.searchController = searchController
         navigationItem.hidesSearchBarWhenScrolling = false
         definesPresentationContext = true
         
-        NSLayoutConstraint.activate([
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-        ])
+        tableView.fillHorizontally()
+        tableView.Top == view.safeAreaLayoutGuide.Top
+        tableView.Bottom == view.safeAreaLayoutGuide.Bottom
     }
     
     @objc

@@ -90,53 +90,51 @@ final class TodosAPIClient: TodosAPI {
         }
         
         task.resume()
+    }
+    
+    func fetchUsers(completion: @escaping (Result<[User], Error>) -> Void) {
+        if let cachedUsers {
+            completion(.success(cachedUsers))
+            return
         }
-
-        func fetchUsers(
-            completion: @escaping (Result<[User], Error>) -> Void
-        ) {
-            if let cachedUsers {
-                completion(.success(cachedUsers))
+        
+        guard let url = URL(string: "users", relativeTo: baseURL) else {
+            completion(.failure(APIError.invalidURL))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        
+        let task = session.dataTask(with: request) { [weak self] data, response, error in
+            if let error {
+                completion(.failure(APIError.underlying(error)))
                 return
             }
-
-            guard let url = URL(string: "users", relativeTo: baseURL) else {
-                completion(.failure(APIError.invalidURL))
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion(.failure(APIError.invalidResponse))
                 return
             }
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-
-            let task = session.dataTask(with: request) { [weak self] data, response, error in
-                if let error {
-                    completion(.failure(APIError.underlying(error)))
-                    return
-                }
-
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    completion(.failure(APIError.invalidResponse))
-                    return
-                }
-
-                guard (200..<300).contains(httpResponse.statusCode) else {
-                    completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode)))
-                    return
-                }
-
-                guard let data else {
-                    completion(.failure(APIError.invalidResponse))
-                    return
-                }
-
-                do {
-                    let users = try JSONDecoder().decode([User].self, from: data)
-                    self?.cachedUsers = users
-                    completion(.success(users))
-                } catch {
-                    completion(.failure(APIError.decoding(error)))
-                }
+            
+            guard (200..<300).contains(httpResponse.statusCode) else {
+                completion(.failure(APIError.serverError(statusCode: httpResponse.statusCode)))
+                return
             }
+            
+            guard let data else {
+                completion(.failure(APIError.invalidResponse))
+                return
+            }
+            
+            do {
+                let users = try JSONDecoder().decode([User].self, from: data)
+                self?.cachedUsers = users
+                completion(.success(users))
+            } catch {
+                completion(.failure(APIError.decoding(error)))
+            }
+        }
         
         task.resume()
     }
@@ -149,7 +147,11 @@ final class TodosAPIClient: TodosAPI {
         completion(.success(Self.paginate(todos: cachedTodos, page: page, limit: limit)))
     }
     
-    private static func paginate(todos: [Todo], page: Int, limit: Int) -> PaginatedTodos {
+    private static func paginate(
+        todos: [Todo],
+        page: Int,
+        limit: Int
+    ) -> PaginatedTodos {
         guard page > 0 else {
             return PaginatedTodos(todos: [], currentPage: page, pageSize: limit, totalCount: todos.count)
         }

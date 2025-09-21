@@ -6,28 +6,20 @@
 //
 
 import UIKit
+import Stevia
 
 final class TodoDetailsViewController: UIViewController {
     private let viewModel: TodoDetailsViewModel
     
-    private lazy var scrollView: UIScrollView = {
-        let scrollView = UIScrollView()
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        return scrollView
-    }()
+    private lazy var scrollView = UIScrollView()
     
-    private lazy var contentView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
-    }()
+    private lazy var contentView = UIView()
     
     private lazy var stackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .vertical
         stack.alignment = .fill
         stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false
         return stack
     }()
     
@@ -50,27 +42,23 @@ final class TodoDetailsViewController: UIViewController {
     }
     
     private func configureLayout() {
-        view.addSubview(scrollView)
-        scrollView.addSubview(contentView)
-        contentView.addSubview(stackView)
+        view.subviews(scrollView)
+        scrollView.subviews(contentView)
+        contentView.subviews(stackView)
         
-        NSLayoutConstraint.activate([
-            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            
-            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
-            
-            stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            stackView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            stackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20)
-        ])
+        scrollView.fillHorizontally()
+        scrollView.Top == view.safeAreaLayoutGuide.Top
+        scrollView.Bottom == view.safeAreaLayoutGuide.Bottom
+        
+        contentView.fillHorizontally()
+        contentView.Top == scrollView.Top
+        contentView.Bottom == scrollView.Bottom
+        contentView.Width == scrollView.Width
+        
+        stackView.Left == contentView.Left + 16
+        stackView.Right == contentView.Right - 16
+        stackView.Top == contentView.Top + 20
+        stackView.Bottom == contentView.Bottom - 20
     }
     
     private func populateContent() {
